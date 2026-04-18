@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
@@ -19,11 +19,35 @@ const EMPTY_ROW = {
   precio_unitario: '',
 };
 
+const EMPTY_EXPORT_FORM = {
+  clienteId: '',
+  rfc: '',
+  razon_social: '',
+  forma_pago: '',
+  metodo_pago: '',
+  uso_cfdi: '',
+};
+
 export default function ProcesadorIa() {
   const [file, setFile] = useState(null);
   const [procesando, setProcesando] = useState(false);
   const [error, setError] = useState('');
   const [rows, setRows] = useState([]);
+  const [showExportPanel, setShowExportPanel] = useState(false);
+  const [clientes, setClientes] = useState([]);
+  const [loadingClientes, setLoadingClientes] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [templateInfo, setTemplateInfo] = useState(null);
+  const [exportForm, setExportForm] = useState(EMPTY_EXPORT_FORM);
+
+  useEffect(() => {
+    fetch('/api/plantillas-exportacion')
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.error) setTemplateInfo(data.template || null);
+      })
+      .catch(() => {});
+  }, []);
 
   const total = useMemo(() => {
     return rows.reduce((sum, row) => {
@@ -93,6 +117,111 @@ export default function ProcesadorIa() {
     }
   }
 
+  function onExportFieldChange(event) {
+    const { name, value } = event.target;
+
+    if (name === 'clienteId') {
+      const cliente = clientes.find((item) => item._id === value);
+      if (!cliente) {
+        setExportForm((prev) => ({ ...prev, clienteId: value }));
+        return;
+      }
+
+      setExportForm({
+        clienteId: value,
+        rfc: cliente.rfc || '',
+        razon_social: cliente.razon_social || '',
+        forma_pago: `${cliente.forma_pago?.codigo || ''} ${cliente.forma_pago?.descripcion || ''}`.trim(),
+        metodo_pago: `${cliente.metodo_pago?.codigo || ''} ${cliente.metodo_pago?.descripcion || ''}`.trim(),
+        uso_cfdi: `${cliente.uso_cfdi?.codigo || ''} ${cliente.uso_cfdi?.descripcion || ''}`.trim(),
+      });
+      return;
+    }
+
+    setExportForm((prev) => ({ ...prev, [name]: value }));
+  }
+
+  async function openExportPanel() {
+    setError('');
+    setShowExportPanel(true);
+
+    if (clientes.length > 0 || loadingClientes) return;
+
+    setLoadingClientes(true);
+    try {
+      const res = await fetch('/api/clientes');
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'No fue posible obtener los clientes.');
+        return;
+      }
+      setClientes(data);
+    } catch {
+      setError('Error de conexion al obtener clientes.');
+    } finally {
+      setLoadingClientes(false);
+    }
+  }
+
+  async function exportarExcel() {
+    setError('');
+
+    if (!templateInfo) {
+      setError('Primero configura una plantilla de exportacion.');
+      return;
+    }
+
+    if (!exportForm.rfc || !exportForm.razon_social) {
+      setError('Completa la informacion del cliente antes de exportar.');
+      return;
+    }
+
+    if (rows.length === 0) {
+      setError('No hay filas para exportar.');
+      return;
+    }
+
+    setExporting(true);
+    try {
+      const response = await fetch('/api/exportaciones/excel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cliente: {
+            rfc: exportForm.rfc,
+            razon_social: exportForm.razon_social,
+            forma_pago: exportForm.forma_pago,
+            metodo_pago: exportForm.metodo_pago,
+            uso_cfdi: exportForm.uso_cfdi,
+          },
+          rows,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        setError(data.error || 'No fue posible exportar el archivo.');
+        return;
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const safeName = (exportForm.razon_social || 'exportacion').replace(/[^a-zA-Z0-9-_]+/g, '_');
+      link.href = url;
+      link.download = `${safeName}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      setShowExportPanel(false);
+    } catch {
+      setError('Error de conexion al exportar el archivo.');
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <div className="container">
       <div className="top-bar">
@@ -129,6 +258,79 @@ export default function ProcesadorIa() {
           </div>
         ) : (
           <div className="table-wrapper">
+            <div className="toolbar-row">
+              <div>
+                <strong>Detalle de productos</strong>
+              </div>
+              <div className="toolbar-actions">
+                <button type="button" className="btn btn-secondary" onClick={addRow}>
+                  Agregar fila
+                </button>
+                <button type="button" className="btn" onClick={openExportPanel}>
+                  Exportar
+                </button>
+              </div>
+            </div>
+
+            {showExportPanel && (
+              <div className="export-panel">
+                {!templateInfo && (
+                  <div className="alert alert-error">
+                    No hay plantilla activa. Primero carga una en la seccion Plantillas.
+                  </div>
+                )}
+
+                <div className="form-grid form-grid-2">
+                  <div className="form-group">
+                    <label htmlFor="clienteId">Cliente</label>
+                    <select
+                      id="clienteId"
+                      name="clienteId"
+                      value={exportForm.clienteId}
+                      onChange={onExportFieldChange}
+                      disabled={loadingClientes}
+                    >
+                      <option value="">{loadingClientes ? 'Cargando clientes...' : '-- Selecciona un cliente --'}</option>
+                      {clientes.map((cliente) => (
+                        <option key={cliente._id} value={cliente._id}>
+                          {cliente.rfc} - {cliente.razon_social}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="rfc">RFC</label>
+                    <input id="rfc" name="rfc" value={exportForm.rfc} onChange={onExportFieldChange} />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="razon_social">Razon social</label>
+                    <input id="razon_social" name="razon_social" value={exportForm.razon_social} onChange={onExportFieldChange} />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="forma_pago">Forma de pago</label>
+                    <input id="forma_pago" name="forma_pago" value={exportForm.forma_pago} onChange={onExportFieldChange} />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="metodo_pago">Metodo de pago</label>
+                    <input id="metodo_pago" name="metodo_pago" value={exportForm.metodo_pago} onChange={onExportFieldChange} />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="uso_cfdi">Uso CFDI</label>
+                    <input id="uso_cfdi" name="uso_cfdi" value={exportForm.uso_cfdi} onChange={onExportFieldChange} />
+                  </div>
+                </div>
+
+                <div className="modal-actions" style={{ marginTop: 8 }}>
+                  <button type="button" className="btn btn-secondary" onClick={() => setShowExportPanel(false)}>
+                    Cancelar
+                  </button>
+                  <button type="button" className="btn" onClick={exportarExcel} disabled={exporting || !templateInfo}>
+                    {exporting ? 'Exportando...' : 'Confirmar exportacion'}
+                  </button>
+                </div>
+              </div>
+            )}
+
             <table>
               <thead>
                 <tr>
@@ -187,9 +389,7 @@ export default function ProcesadorIa() {
             </table>
 
             <div className="grid-footer">
-              <button type="button" className="btn btn-secondary" onClick={addRow}>
-                Agregar fila
-              </button>
+              <span>{templateInfo ? `Plantilla activa: ${templateInfo.fileName}` : 'Sin plantilla activa'}</span>
               <strong>Total: {total.toFixed(2)}</strong>
             </div>
           </div>
