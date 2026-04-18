@@ -14,10 +14,19 @@ function fileToBase64(file) {
 }
 
 const EMPTY_ROW = {
+  id: '',
   descripcion: '',
   cantidad: '',
   precio_unitario: '',
 };
+
+function createRow(data = {}) {
+  return {
+    ...EMPTY_ROW,
+    ...data,
+    id: data.id || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  };
+}
 
 const EMPTY_EXPORT_FORM = {
   clienteId: '',
@@ -68,7 +77,7 @@ export default function ProcesadorIa() {
   }
 
   function addRow() {
-    setRows((prev) => [...prev, { ...EMPTY_ROW }]);
+    setRows((prev) => [...prev, createRow()]);
   }
 
   function removeRow(index) {
@@ -109,7 +118,7 @@ export default function ProcesadorIa() {
         return;
       }
 
-      setRows(data.productos || []);
+      setRows((data.productos || []).map((item) => createRow(item)));
     } catch {
       setError('Error de conexion al procesar el archivo.');
     } finally {
@@ -348,7 +357,7 @@ export default function ProcesadorIa() {
                   const importe = qty * price;
 
                   return (
-                    <tr key={`${index}-${row.descripcion}`}>
+                    <tr key={row.id}>
                       <td className="col-descripcion">
                         <input
                           value={row.descripcion}
