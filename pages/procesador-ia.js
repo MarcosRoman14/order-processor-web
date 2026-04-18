@@ -123,6 +123,9 @@ export default function ProcesadorIa() {
         {rows.length === 0 ? (
           <div className="empty-state">
             <p>Aun no hay resultados para mostrar.</p>
+            <button type="button" className="btn btn-secondary" onClick={addRow}>
+              Agregar fila manualmente
+            </button>
           </div>
         ) : (
           <div className="table-wrapper">
