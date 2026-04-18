@@ -2,8 +2,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 
 const menu = [
-  { label: 'Dashboard', href: '/',         icon: '⊞', exact: true  },
-  { label: 'Clientes',  href: '/clientes', icon: '👥', exact: false },
+  { label: 'Dashboard', href: '/', exact: true },
+  { label: 'Clientes', href: '/clientes', exact: false },
+  { label: 'Procesador IA', href: '/procesador-ia', exact: false },
 ];
 
 export default function Layout({ children }) {
@@ -18,7 +19,6 @@ export default function Layout({ children }) {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="sidebar-logo">
-          <span className="sidebar-logo-icon">📋</span>
           <span className="sidebar-logo-text">Order Processor</span>
         </div>
         <nav className="sidebar-nav">
@@ -28,8 +28,7 @@ export default function Layout({ children }) {
               href={item.href}
               className={`sidebar-link ${isActive(item) ? 'sidebar-link--active' : ''}`}
             >
-              <span className="sidebar-link-icon">{item.icon}</span>
-              <span>{item.label}</span>
+              {item.label}
             </Link>
           ))}
         </nav>

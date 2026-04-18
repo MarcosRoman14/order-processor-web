@@ -51,7 +51,7 @@ export default function Clientes() {
         <Link href="/clientes/nuevo" className="btn">+ Nuevo cliente</Link>
       </div>
 
-      {exito && <div className="alert alert-success">✅ {exito}</div>}
+      {exito && <div className="alert alert-success">{exito}</div>}
       {error && <div className="alert alert-error">{error}</div>}
 
       <div className="card" style={{ padding: 0 }}>
