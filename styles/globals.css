@@ -138,3 +138,73 @@ tr:hover td { background: #f8f9fa; }
   color: #888;
 }
 .empty-state p { margin-bottom: 16px; }
+
+/* --- Layout con sidebar --- */
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: 220px;
+  min-width: 220px;
+  background: #1a1a2e;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+.sidebar-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 18px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.sidebar-logo-icon { font-size: 1.3rem; }
+
+.sidebar-logo-text {
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.95rem;
+  line-height: 1.2;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 0;
+  gap: 2px;
+}
+
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  color: rgba(255,255,255,0.65);
+  text-decoration: none;
+  font-size: 0.9rem;
+  border-radius: 0;
+  transition: background 0.15s, color 0.15s;
+}
+
+.sidebar-link:hover {
+  background: rgba(255,255,255,0.07);
+  color: #fff;
+}
+
+.sidebar-link--active {
+  background: rgba(0, 112, 243, 0.25);
+  color: #fff;
+  border-left: 3px solid #0070f3;
+}
+
+.sidebar-link-icon { font-size: 1rem; width: 20px; text-align: center; }
+
+.main-content {
+  flex: 1;
+  overflow-y: auto;
+  background: #f4f6f8;
+}
