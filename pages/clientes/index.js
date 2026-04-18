@@ -85,14 +85,21 @@ export default function Clientes() {
                     <td>{c.uso_cfdi?.codigo} – {c.uso_cfdi?.descripcion}</td>
                     <td>
                       <div className="table-actions">
-                        <Link href={`/clientes/${c._id}/editar`} className="btn btn-sm">
-                          Editar
+                        <Link
+                          href={`/clientes/${c._id}/editar`}
+                          className="btn btn-sm"
+                          aria-label="Editar cliente"
+                          title="Editar cliente"
+                        >
+                          ✎
                         </Link>
                         <button
                           className="btn btn-danger btn-sm"
                           onClick={() => { setErrorEliminar(''); setEliminando(c._id); }}
+                          aria-label="Eliminar cliente"
+                          title="Eliminar cliente"
                         >
-                          Eliminar
+                          ×
                         </button>
                       </div>
                     </td>
