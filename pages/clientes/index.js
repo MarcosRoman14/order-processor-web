@@ -7,10 +7,15 @@ export default function Clientes() {
   const [clientes, setClientes] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
+  const [eliminando, setEliminando] = useState(null);   // id del cliente a eliminar
+  const [errorEliminar, setErrorEliminar] = useState('');
 
-  const exito = router.query.exito === '1';
+  const exito =
+    router.query.exito === '1' ? 'Cliente registrado correctamente.' :
+    router.query.exito === '2' ? 'Cliente actualizado correctamente.' : '';
 
-  useEffect(() => {
+  function cargarClientes() {
+    setCargando(true);
     fetch('/api/clientes')
       .then((r) => r.json())
       .then((data) => {
@@ -19,23 +24,34 @@ export default function Clientes() {
       })
       .catch(() => setError('Error de conexión al obtener clientes'))
       .finally(() => setCargando(false));
-  }, []);
+  }
+
+  useEffect(() => { cargarClientes(); }, []);
+
+  async function confirmarEliminar() {
+    setErrorEliminar('');
+    try {
+      const res = await fetch(`/api/clientes/${eliminando}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) {
+        setErrorEliminar(data.error || 'Error al eliminar');
+        return;
+      }
+      setEliminando(null);
+      cargarClientes();
+    } catch {
+      setErrorEliminar('Error de conexión');
+    }
+  }
 
   return (
     <div className="container">
       <div className="top-bar">
         <h1>Clientes</h1>
-        <Link href="/clientes/nuevo" className="btn">
-          + Nuevo cliente
-        </Link>
+        <Link href="/clientes/nuevo" className="btn">+ Nuevo cliente</Link>
       </div>
 
-      {exito && (
-        <div className="alert alert-success">
-          Cliente registrado correctamente.
-        </div>
-      )}
-
+      {exito && <div className="alert alert-success">✅ {exito}</div>}
       {error && <div className="alert alert-error">{error}</div>}
 
       <div className="card" style={{ padding: 0 }}>
@@ -44,9 +60,7 @@ export default function Clientes() {
         ) : clientes.length === 0 ? (
           <div className="empty-state">
             <p>No hay clientes registrados aún.</p>
-            <Link href="/clientes/nuevo" className="btn">
-              Registrar primer cliente
-            </Link>
+            <Link href="/clientes/nuevo" className="btn">Registrar primer cliente</Link>
           </div>
         ) : (
           <div className="table-wrapper">
@@ -58,6 +72,7 @@ export default function Clientes() {
                   <th>Forma de Pago</th>
                   <th>Método de Pago</th>
                   <th>Uso CFDI</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
@@ -68,6 +83,19 @@ export default function Clientes() {
                     <td>{c.forma_pago?.codigo} – {c.forma_pago?.descripcion}</td>
                     <td>{c.metodo_pago?.codigo} – {c.metodo_pago?.descripcion}</td>
                     <td>{c.uso_cfdi?.codigo} – {c.uso_cfdi?.descripcion}</td>
+                    <td>
+                      <div className="table-actions">
+                        <Link href={`/clientes/${c._id}/editar`} className="btn btn-sm">
+                          Editar
+                        </Link>
+                        <button
+                          className="btn btn-danger btn-sm"
+                          onClick={() => { setErrorEliminar(''); setEliminando(c._id); }}
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -75,6 +103,25 @@ export default function Clientes() {
           </div>
         )}
       </div>
+
+      {/* Modal de confirmación de eliminación */}
+      {eliminando && (
+        <div className="modal-overlay" onClick={() => setEliminando(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2>¿Eliminar cliente?</h2>
+            <p>Esta acción no se puede deshacer.</p>
+            {errorEliminar && <div className="alert alert-error" style={{ marginTop: 12 }}>{errorEliminar}</div>}
+            <div className="modal-actions">
+              <button className="btn btn-secondary" onClick={() => setEliminando(null)}>
+                Cancelar
+              </button>
+              <button className="btn btn-danger" onClick={confirmarEliminar}>
+                Sí, eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
