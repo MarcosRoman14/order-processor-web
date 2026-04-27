@@ -1,40 +1,60 @@
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import clientPromise from '../../../lib/mongodb';
 
-function ensureCellInRange(sheet, address) {
-  const cell = XLSX.utils.decode_cell(address);
-  const currentRange = sheet['!ref'] ? XLSX.utils.decode_range(sheet['!ref']) : {
-    s: { c: 0, r: 0 },
-    e: { c: 0, r: 0 },
-  };
-
-  currentRange.s.c = Math.min(currentRange.s.c, cell.c);
-  currentRange.s.r = Math.min(currentRange.s.r, cell.r);
-  currentRange.e.c = Math.max(currentRange.e.c, cell.c);
-  currentRange.e.r = Math.max(currentRange.e.r, cell.r);
-  sheet['!ref'] = XLSX.utils.encode_range(currentRange);
-}
-
-function setCell(sheet, address, value) {
-  ensureCellInRange(sheet, address);
-
-  if (value === null || value === undefined || value === '') {
-    sheet[address] = { t: 's', v: '' };
-    return;
-  }
+function normalizeCellValue(value) {
+  if (value === null || value === undefined || value === '') return '';
 
   if (typeof value === 'number' && Number.isFinite(value)) {
-    sheet[address] = { t: 'n', v: value };
-    return;
+    return value;
   }
 
   const numeric = Number(value);
-  if (typeof value === 'string' && value.trim() !== '' && !Number.isNaN(numeric) && /^-?\d+(\.\d+)?$/.test(value.trim())) {
-    sheet[address] = { t: 'n', v: numeric };
+  if (
+    typeof value === 'string'
+    && value.trim() !== ''
+    && !Number.isNaN(numeric)
+    && /^-?\d+(\.\d+)?$/.test(value.trim())
+  ) {
+    return numeric;
+  }
+
+  return String(value);
+}
+
+function setCell(worksheet, address, value) {
+  const cell = worksheet.getCell(address);
+  const currentValue = cell.value;
+
+  // No sobrescribir celdas con formulas compartidas de la plantilla.
+  if (
+    currentValue
+    && typeof currentValue === 'object'
+    && (currentValue.formula || currentValue.sharedFormula)
+  ) {
     return;
   }
 
-  sheet[address] = { t: 's', v: String(value) };
+  cell.value = normalizeCellValue(value);
+}
+
+function cloneStyle(style) {
+  return style ? JSON.parse(JSON.stringify(style)) : undefined;
+}
+
+function copyTemplateRowStyle(worksheet, fromRowNumber, toRowNumber, columns) {
+  if (fromRowNumber === toRowNumber) return;
+
+  columns.forEach((columnLetter) => {
+    const fromCell = worksheet.getCell(`${columnLetter}${fromRowNumber}`);
+    const toCell = worksheet.getCell(`${columnLetter}${toRowNumber}`);
+    const styleClone = cloneStyle(fromCell.style);
+    if (styleClone && Object.keys(styleClone).length > 0) {
+      toCell.style = styleClone;
+    }
+    if (fromCell.numFmt && !toCell.numFmt) {
+      toCell.numFmt = fromCell.numFmt;
+    }
+  });
 }
 
 export default async function handler(req, res) {
@@ -61,33 +81,45 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'No hay una plantilla activa configurada.' });
     }
 
-    const workbook = XLSX.read(Buffer.from(template.base64, 'base64'), { type: 'buffer' });
-    const sheetName = template.sheetName || workbook.SheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(Buffer.from(template.base64, 'base64'));
 
-    if (!sheet) {
+    const sheetName = template.sheetName || workbook.worksheets[0]?.name;
+    const worksheet = workbook.getWorksheet(sheetName);
+
+    if (!worksheet) {
       return res.status(400).json({ error: 'La hoja configurada no existe en la plantilla.' });
     }
 
-    setCell(sheet, template.rfcCell, cliente.rfc);
-    setCell(sheet, template.razonSocialCell, cliente.razon_social);
-    setCell(sheet, template.formaPagoCell, cliente.forma_pago);
-    setCell(sheet, template.metodoPagoCell, cliente.metodo_pago);
-    setCell(sheet, template.usoCfdiCell, cliente.uso_cfdi);
+    setCell(worksheet, template.rfcCell, cliente.rfc);
+    setCell(worksheet, template.razonSocialCell, cliente.razon_social);
+    setCell(worksheet, template.formaPagoCell, cliente.forma_pago);
+    setCell(worksheet, template.metodoPagoCell, cliente.metodo_pago);
+    setCell(worksheet, template.usoCfdiCell, cliente.uso_cfdi);
+
+    const startRow = Number(template.startRow || 10);
+    const itemColumns = [
+      template.descripcionColumn,
+      template.cantidadColumn,
+      template.precioUnitarioColumn,
+      template.importeColumn,
+    ];
 
     rows.forEach((row, index) => {
-      const rowNumber = Number(template.startRow || 10) + index;
+      const rowNumber = startRow + index;
       const qty = Number(row.cantidad || 0);
       const price = Number(row.precio_unitario || 0);
       const importe = qty * price;
 
-      setCell(sheet, `${template.descripcionColumn}${rowNumber}`, row.descripcion || '');
-      setCell(sheet, `${template.cantidadColumn}${rowNumber}`, row.cantidad || '');
-      setCell(sheet, `${template.precioUnitarioColumn}${rowNumber}`, row.precio_unitario || '');
-      setCell(sheet, `${template.importeColumn}${rowNumber}`, importe);
+      copyTemplateRowStyle(worksheet, startRow, rowNumber, itemColumns);
+
+      setCell(worksheet, `${template.descripcionColumn}${rowNumber}`, row.descripcion || '');
+      setCell(worksheet, `${template.cantidadColumn}${rowNumber}`, row.cantidad || '');
+      setCell(worksheet, `${template.precioUnitarioColumn}${rowNumber}`, row.precio_unitario || '');
+      setCell(worksheet, `${template.importeColumn}${rowNumber}`, importe);
     });
 
-    const output = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    const output = await workbook.xlsx.writeBuffer();
     const safeName = String(cliente.razon_social || 'exportacion').replace(/[^a-zA-Z0-9-_]+/g, '_');
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

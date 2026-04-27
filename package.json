@@ -9,6 +9,7 @@
     "seed": "node scripts/seed.js"
   },
   "dependencies": {
+    "exceljs": "^4.4.0",
     "mongodb": "^6",
     "next": "^14.2.35",
     "react": "^18",
