@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 const menu = [
   { label: 'Dashboard', href: '/', exact: true },
   { label: 'Clientes', href: '/clientes', exact: false },
+  { label: 'Productos', href: '/productos', exact: false },
   { label: 'Procesador IA', href: '/procesador-ia', exact: false },
   { label: 'Plantillas', href: '/plantillas-exportacion', exact: false },
 ];
