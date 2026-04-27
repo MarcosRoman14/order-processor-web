@@ -369,6 +369,60 @@ tr:hover td { background: #f8f9fa; }
   background: #fafbfc;
 }
 
+.combobox-wrap {
+  position: relative;
+  flex: 1;
+}
+
+.combobox-list {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  max-height: 250px;
+  overflow-y: auto;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.08);
+}
+
+.combobox-item {
+  width: 100%;
+  border: none;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  text-align: left;
+  cursor: pointer;
+  font-size: 0.9rem;
+  border-bottom: 1px solid #f0f1f2;
+}
+
+.combobox-item strong {
+  color: #1a1a2e;
+  font-size: 0.85rem;
+}
+
+.combobox-item:hover,
+.combobox-item--active {
+  background: #eef5ff;
+}
+
+.combobox-item--empty {
+  color: #888;
+  cursor: default;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
 @media (max-width: 900px) {
   .form-grid-2,
   .form-grid-3,
